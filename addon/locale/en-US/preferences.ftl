@@ -11,6 +11,11 @@ pref-default-action-keep-all =
     .label = [Keep All]: Save all items
 pref-default-action-always-ask =
     .label = [Always Ask]: Ask for action every time
+pref-default-action-master =
+    .label = [Use Master] Add and then use Master Preferences
+
+pref-ignore-item-types =
+    .label = Ignore item types when detecting duplicates
 
 pref-bulk-merge-title = Bulk Merge
 

@@ -4,11 +4,13 @@ export class DuplicateFinder {
   private readonly item: Zotero.Item;
   private readonly itemTypeID: number;
   private candidateItemIDs: number[];
+  private ignoreItemType: boolean;
 
-  constructor(item: Zotero.Item | number) {
+  constructor(item: Zotero.Item | number, ignoreItemType = false) {
     this.item = typeof item === "number" ? Zotero.Items.get(item) : item;
     this.candidateItemIDs = [];
     this.itemTypeID = this.item.itemTypeID;
+    this.ignoreItemType = ignoreItemType;
   }
 
   async find() {
@@ -73,6 +75,10 @@ export class DuplicateFinder {
     return this;
   }
 
+  private buildTypeClause() {
+    return this.ignoreItemType ? "" : "AND itemTypeID = ?";
+  }
+
   private async findByDOI() {
     if (this.candidateItemIDs.length === 1) {
       return this;
@@ -89,6 +95,7 @@ export class DuplicateFinder {
     const partialWhereClause = dois.map(() => "TRIM(UPPER(value)) LIKE ?").join(" OR ");
     const fieldIDs = [Zotero.ItemFields.getID("DOI"), Zotero.ItemFields.getID("url"), Zotero.ItemFields.getID("extra")];
     const fieldIDInClause = fieldIDs.map(() => "?").join(", ");
+    const typeClause = this.buildTypeClause();
     const query = `SELECT DISTINCT itemID
                    FROM itemDataValues
                             JOIN itemData USING (valueID)
@@ -96,11 +103,17 @@ export class DuplicateFinder {
                             LEFT JOIN deletedItems USING (itemID)
                    WHERE deletedItems.itemID IS NULL
                      AND libraryID = ?
-                     AND itemTypeID = ?
+                     ${typeClause}
                      AND fieldID IN (${fieldIDInClause})
                      AND (${partialWhereClause}) ${candidateAndClause};`;
     const doiParams = dois.map((doi) => `%${doi}%`);
-    const params = [this.item.libraryID, this.itemTypeID, ...fieldIDs, ...doiParams, ...this.candidateItemIDs];
+    const params = [
+      this.item.libraryID,
+      ...(this.ignoreItemType ? [] : [this.itemTypeID]),
+      ...fieldIDs,
+      ...doiParams,
+      ...this.candidateItemIDs
+    ];
     const rows = (await Zotero.DB.queryAsync(query, params)) as { itemID: number }[] | undefined;
     this.candidateItemIDs = rows?.map((row) => row.itemID) ?? [];
     return this;
@@ -122,6 +135,7 @@ export class DuplicateFinder {
     const partialWhereClause = isbns.map(() => "REPLACE(value, '-', '') LIKE ?").join(" OR ");
     const fieldIDs: (number | false)[] = ["DOI", "ISBN", "url", "extra"].map(Zotero.ItemFields.getID);
     const fieldIDInClause = fieldIDs.map(() => "?").join(", ");
+    const typeClause = this.buildTypeClause();
     // Match by ISBN
     const query = `SELECT DISTINCT itemID
                    FROM itemDataValues
@@ -130,11 +144,17 @@ export class DuplicateFinder {
                             LEFT JOIN deletedItems USING (itemID)
                    WHERE deletedItems.itemID IS NULL
                      AND libraryID = ?
-                     AND itemTypeID = ?
+                     ${typeClause}
                      AND fieldID IN (${fieldIDInClause})
                      AND (${partialWhereClause}) ${candidateAndClause};`;
     const isbnPragmas = isbns.map((isbn) => `%${isbn}%`);
-    const params = [this.item.libraryID, this.itemTypeID, ...fieldIDs, ...isbnPragmas, ...this.candidateItemIDs];
+    const params = [
+      this.item.libraryID,
+      ...(this.ignoreItemType ? [] : [this.itemTypeID]),
+      ...fieldIDs,
+      ...isbnPragmas,
+      ...this.candidateItemIDs
+    ];
     const rows = (await Zotero.DB.queryAsync(query, params)) as { itemID: number }[] | undefined;
     this.candidateItemIDs = rows?.map((row) => row.itemID) ?? [];
     return this;
@@ -159,6 +179,7 @@ export class DuplicateFinder {
 
     const candidateAndClause = buildCandidateAndClause(this.candidateItemIDs);
     const partialWhereClause = titles.map(() => "TRIM(UPPER(value)) LIKE ?").join(" OR ");
+    const typeClause = this.buildTypeClause();
     const query = `SELECT DISTINCT itemID
                    FROM itemDataValues
                             JOIN itemData USING (valueID)
@@ -166,10 +187,16 @@ export class DuplicateFinder {
                             LEFT JOIN deletedItems USING (itemID)
                    WHERE deletedItems.itemID IS NULL
                      AND libraryID = ?
-                     AND itemTypeID = ?
+                     ${typeClause}
                      AND fieldID IN (${titleIDs.map(() => "?").join(", ")})
                      AND (${partialWhereClause}) ${candidateAndClause};`;
-    const params = [this.item.libraryID, this.itemTypeID, ...titleIDs, ...titles, ...this.candidateItemIDs];
+    const params = [
+      this.item.libraryID,
+      ...(this.ignoreItemType ? [] : [this.itemTypeID]),
+      ...titleIDs,
+      ...titles,
+      ...this.candidateItemIDs
+    ];
     const rows = (await Zotero.DB.queryAsync(query, params)) as { itemID: number }[] | undefined;
     this.candidateItemIDs = rows?.map((row) => row.itemID) ?? [];
     return this;
@@ -231,6 +258,7 @@ export class DuplicateFinder {
     const dateFields = Zotero.ItemFields.getTypeFieldsFromBase("date") as number[];
     dateFields.push(Zotero.ItemFields.getID("date") as number);
 
+    const typeClause = this.buildTypeClause();
     const query = `SELECT DISTINCT itemID
                    FROM itemDataValues
                             JOIN itemData USING (valueID)
@@ -238,12 +266,19 @@ export class DuplicateFinder {
                             LEFT JOIN deletedItems USING (itemID)
                    WHERE deletedItems.itemID IS NULL
                      AND libraryID = ?
-                     AND itemTypeID = ?
+                     ${typeClause}
                      AND fieldID IN (${dateFields.map(() => "?").join(", ")})
                      AND SUBSTR(value, 1, 4) >= '?'
                      AND SUBSTR(value, 1, 4) <= '?'
                        ${candidateAndClause};`;
-    const params = [this.item.libraryID, this.itemTypeID, ...dateFields, minYear, maxYear, ...this.candidateItemIDs];
+    const params = [
+      this.item.libraryID,
+      ...(this.ignoreItemType ? [] : [this.itemTypeID]),
+      ...dateFields,
+      minYear,
+      maxYear,
+      ...this.candidateItemIDs
+    ];
     const rows = (await Zotero.DB.queryAsync(query, params)) as { itemID: number }[] | undefined;
     this.candidateItemIDs = rows?.map((row) => row.itemID) ?? [];
     return this;

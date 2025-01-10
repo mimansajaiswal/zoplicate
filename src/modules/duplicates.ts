@@ -119,27 +119,26 @@ export class Duplicates {
     ids: Array<number>,
   ) {
     const defaultAction = getPref("duplicate.default.action") as Action;
+
     if (defaultAction === Action.CANCEL || ids.length === 0) {
       return;
     }
 
-    let duplicateItemMap = new Map<number, DuplicateItems>();
-    for (const id of ids) {
-      const items = duplicatesObj.getSetItemsByItemID(id);
-      if (items.length < 2) {
-        continue;
-      }
-      const duplicateItems = new DuplicateItems(items, getPref("bulk.master.item") as MasterItem);
-      duplicateItemMap.set(duplicateItems.key, duplicateItems);
-    }
+    const duplicateMaps = new Map<number, { existingItemIDs: number[]; action: Action }>();
 
-    const duplicateMaps = ids.reduce((acc, id) => {
-      const existingItemIDs: number[] = duplicatesObj.getSetItemsByItemID(id).filter((i: number) => i !== id);
+    for (const id of ids) {
+      const duplicateSet = duplicatesObj.getSetItemsByItemID(id);
+      if (duplicateSet.length < 2) continue;
+
+      // Filter out the current item from duplicates
+      const existingItemIDs = duplicateSet.filter(i => i !== id);
       if (existingItemIDs.length > 0) {
-        acc.set(id, { existingItemIDs, action: defaultAction });
+        duplicateMaps.set(id, {
+          existingItemIDs,
+          action: defaultAction
+        });
       }
-      return acc;
-    }, new Map<number, { existingItemIDs: number[]; action: Action }>());
+    }
 
     if (duplicateMaps.size === 0) return;
 
@@ -147,7 +146,8 @@ export class Duplicates {
       await this.showDuplicates(duplicateMaps);
       return;
     }
-    this.processDuplicates(duplicateMaps).then(r => {}); // DONT WAIT
+
+    this.processDuplicates(duplicateMaps).then(r => { }); // DONT WAIT
   }
 
   async processDuplicates(duplicateMaps: Map<number, { existingItemIDs: number[]; action: Action }>) {
@@ -187,11 +187,17 @@ export class Duplicates {
           continue;
         }
         const duplicateItems = new DuplicateItems(existingItemIDs, masterItemPref);
-        const masterItem = duplicateItems.masterItem;
-        const otherItems = duplicateItems.otherItems;
         items.push({
-          masterItem: masterItem,
-          otherItems: [...otherItems, newItem],
+          masterItem: duplicateItems.masterItem,
+          otherItems: [...duplicateItems.otherItems, newItem],
+        });
+      } else if (action === Action.MASTER) {
+        // Use DuplicateItems to select master from all items
+        const allItems = [newItemID, ...existingItemIDs];
+        const duplicateItems = new DuplicateItems(allItems, masterItemPref);
+        items.push({
+          masterItem: duplicateItems.masterItem,
+          otherItems: duplicateItems.otherItems
         });
       }
     }

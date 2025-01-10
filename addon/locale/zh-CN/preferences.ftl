@@ -11,6 +11,11 @@ pref-default-action-keep-all =
     .label = [保留全部]: 保留所有条目，不合并任何项
 pref-default-action-always-ask =
     .label = [始终询问]: 每次都询问我该如何处理
+pref-default-action-master =
+    .label = [使用主檔] 新增並使用主檔偏好設定
+    
+pref-ignore-item-types =
+    .label = 偵測重複項目時忽略項目類型
 
 pref-bulk-merge-title = 批量合并
 

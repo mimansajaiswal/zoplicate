@@ -32,6 +32,10 @@ export function showingDuplicateStats() {
   return getPref("duplicate.stats.enable") as boolean;
 }
 
+export function ignoreItemTypes() {
+  return getPref("duplicate.ignore.types") as boolean;
+}
+
 /**
  * NOTE: Corresponding to radio values in addon/chrome/content/preferences.xhtml.
  */
@@ -40,6 +44,7 @@ export enum Action {
   DISCARD = "discard",
   CANCEL = "cancel",
   ASK = "ask",
+  MASTER = "master",
 }
 
 /**

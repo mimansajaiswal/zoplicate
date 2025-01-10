@@ -2,7 +2,7 @@ import { NonDuplicates } from "./nonDuplicates";
 import { refreshDuplicateStats } from "./duplicateStats";
 import { NonDuplicatesDB } from "../db/nonDuplicates";
 import { DuplicateItems } from "./duplicateItems";
-import { getPref, MasterItem } from "../utils/prefs";
+import { getPref, MasterItem, ignoreItemTypes } from "../utils/prefs";  // Add ignoreItemTypes import
 import { DuplicateFinder } from "../db/duplicateFinder";
 
 /**
@@ -80,7 +80,9 @@ export function patchItemSaveData() {
           const parentItem = Zotero.Items.get(parentID);
           ztoolkit.log("Parent item", parentID, "deleted?", parentItem?.deleted);
           if (parentItem && parentItem.deleted) {
-            const newParents = await new DuplicateFinder(parentItem).find();
+            // Pass ignoreItemTypes() when creating DuplicateFinder
+            const finder = new DuplicateFinder(parentItem, ignoreItemTypes());
+            const newParents = await finder.find();
 
             if (newParents.length > 0) {
               const masterItemPref = getPref("bulk.master.item") as MasterItem;
